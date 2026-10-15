@@ -1,0 +1,83 @@
+# Generic CodeQL workflow
+# Place at: .github/workflows/codeql.yml
+#
+# Adjust the language matrix for your repo. Supported values include:
+#   actions, c-cpp, csharp, go, java-kotlin, javascript-typescript,
+#   python, ruby, rust, swift
+#
+# Compiled languages (c-cpp, csharp, go, java-kotlin, rust, swift) may need
+# build-mode: manual and a custom build step instead of autobuild.
+
+name: "CodeQL"
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly Sunday 01:30 UTC
+    - cron: "30 1 * * 0"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: java-kotlin
+            build-mode: autobuild
+          - language: go
+            build-mode: autobuild
+          - language: csharp
+            build-mode: autobuild
+          - language: c-cpp
+            build-mode: autobuild
+          - language: ruby
+            build-mode: none
+          - language: actions
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Optional: use a custom config
+          # config-file: ./.github/codeql/codeql-config.yml
+          # Optional: extra queries
+          # queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v3
+
+      # If autobuild fails for a compiled language, switch that language to
+      # build-mode: manual and uncomment/customize this step:
+      # - name: Build
+      #   if: matrix.build-mode == 'manual'
+      #   run: |
+      #     ./build.sh
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
